@@ -1,15 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  CreditCard, Search, Calendar, Clock, AlertCircle, CheckCircle2, 
-  MessageSquare, DollarSign, Receipt, Filter, ArrowUpRight, ArrowDownRight,
-  TrendingDown, ShieldAlert, Sparkles, User, Phone, Check, Copy, ExternalLink,
-  ChevronRight, RefreshCw, SlidersHorizontal, ArrowUpDown
+  CreditCard, Search, CheckCircle2, Receipt, RefreshCw 
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { useInventory } from '../context/InventoryContext';
-import { Sale, Installment, Customer } from '../types';
+import { Sale, Installment } from '../types';
 import { 
-  formatCurrency, 
   getSaleInstallments,
   getInstallmentPaidAmount,
   getInstallmentRemainingAmount,
@@ -19,24 +14,14 @@ import {
 } from '../utils';
 import { InstallmentPaymentModal } from '../components/InstallmentPaymentModal';
 import { InstallmentReceipt } from '../components/InstallmentReceipt';
-import { useNavigate } from 'react-router-dom';
+import { ReceivableCard, InstallmentRowItem } from '../components/receivables/ReceivableCard';
+import { ReceivablesKPIs } from '../components/receivables/ReceivablesKPIs';
+import { ReceivablesTabs, FilterTab } from '../components/receivables/ReceivablesTabs';
 
-interface InstallmentRowItem {
-  sale: Sale;
-  installment: Installment;
-  paidAmount: number;
-  remainingAmount: number;
-  dueInfo: ReturnType<typeof getDueDateDetails>;
-  totalSalePending: number;
-  totalSaleInstallments: number;
-}
-
-type FilterTab = 'pending' | 'overdue' | 'today' | 'this-week' | 'upcoming' | 'paid';
 type SortOption = 'urgent' | 'amount-desc' | 'customer-asc' | 'date-desc';
 
 export function Receivables() {
-  const { sales, customers, isLoading } = useInventory();
-  const navigate = useNavigate();
+  const { sales, isLoading } = useInventory();
 
   // Filters & State
   const [activeTab, setActiveTab] = useState<FilterTab>('pending');
@@ -138,17 +123,19 @@ export function Receivables() {
       if (activeTab === 'overdue' && (isPaid || !item.dueInfo.isOverdue)) return false;
       if (activeTab === 'today' && (isPaid || !item.dueInfo.isToday)) return false;
       if (activeTab === 'this-week' && (isPaid || !item.dueInfo.isThisWeek)) return false;
-      if (activeTab === 'upcoming' && (isPaid || item.dueInfo.diffDays <= 7)) return false;
+      if (activeTab === 'upcoming' && (isPaid || item.dueInfo.isOverdue || item.dueInfo.isToday || item.dueInfo.isThisWeek)) return false;
       if (activeTab === 'paid' && !isPaid) return false;
 
-      // Search filter (customer name, phone, or sale id)
+      // Search query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const custName = (item.sale.customerName || '').toLowerCase();
-        const custPhone = (item.sale.customerPhone || '').toLowerCase();
-        const saleId = item.sale.id.toLowerCase();
-        const matches = custName.includes(q) || custPhone.includes(q) || saleId.includes(q);
-        if (!matches) return false;
+        const matchesCustomer = item.sale.customerName?.toLowerCase().includes(q) || false;
+        const matchesPhone = item.sale.customerPhone?.includes(q) || false;
+        const matchesSaleId = item.sale.id.toLowerCase().includes(q);
+
+        if (!matchesCustomer && !matchesPhone && !matchesSaleId) {
+          return false;
+        }
       }
 
       return true;
@@ -157,14 +144,19 @@ export function Receivables() {
     // Sorting
     filtered.sort((a, b) => {
       if (sortBy === 'urgent') {
-        // Overdue first (most overdue), then today, then upcoming
+        const aPaid = a.remainingAmount <= 0.01;
+        const bPaid = b.remainingAmount <= 0.01;
+        if (aPaid && !bPaid) return 1;
+        if (!aPaid && bPaid) return -1;
         return a.dueInfo.diffDays - b.dueInfo.diffDays;
       }
       if (sortBy === 'amount-desc') {
         return b.remainingAmount - a.remainingAmount;
       }
       if (sortBy === 'customer-asc') {
-        return (a.sale.customerName || '').localeCompare(b.sale.customerName || '');
+        const nameA = a.sale.customerName || '';
+        const nameB = b.sale.customerName || '';
+        return nameA.localeCompare(nameB);
       }
       if (sortBy === 'date-desc') {
         return new Date(b.sale.date).getTime() - new Date(a.sale.date).getTime();
@@ -175,33 +167,22 @@ export function Receivables() {
     return filtered;
   }, [allInstallmentItems, activeTab, searchQuery, sortBy]);
 
-  // Handle WhatsApp Reminder
-  const handleSendReminder = (item: InstallmentRowItem) => {
-    const message = createWhatsAppReminderMessage({
-      customerName: item.sale.customerName,
-      installmentNumber: item.installment.number,
-      totalInstallments: item.totalSaleInstallments,
-      installmentAmount: item.installment.amount,
-      paidAmount: item.paidAmount,
-      installmentRemaining: item.remainingAmount,
-      totalPendingDebt: item.totalSalePending,
-      dueDateStr: item.installment.dueDate,
-      storeName: 'la tienda',
-    });
-
-    const cleanPhone = item.sale.customerPhone?.replace(/\D/g, '');
-    const url = cleanPhone 
-      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
-      : `https://wa.me/?text=${encodeURIComponent(message)}`;
-
-    window.open(url, '_blank');
-    showToast(`Recordatorio preparado para ${item.sale.customerName || 'el cliente'}`);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3500);
   };
 
-  // Copy Reminder Message to Clipboard
-  const handleCopyMessage = (item: InstallmentRowItem) => {
+  const handleSendReminder = (item: InstallmentRowItem) => {
+    const phone = item.sale.customerPhone;
+    if (!phone) {
+      alert('Esta venta no tiene un número de teléfono/WhatsApp asociado.');
+      return;
+    }
+
     const message = createWhatsAppReminderMessage({
-      customerName: item.sale.customerName,
+      customerName: item.sale.customerName || 'Cliente',
       installmentNumber: item.installment.number,
       totalInstallments: item.totalSaleInstallments,
       installmentAmount: item.installment.amount,
@@ -209,210 +190,64 @@ export function Receivables() {
       installmentRemaining: item.remainingAmount,
       totalPendingDebt: item.totalSalePending,
       dueDateStr: item.installment.dueDate,
-      storeName: 'la tienda',
+    });
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
+  const handleCopyMessage = (item: InstallmentRowItem) => {
+    const message = createWhatsAppReminderMessage({
+      customerName: item.sale.customerName || 'Cliente',
+      installmentNumber: item.installment.number,
+      totalInstallments: item.totalSaleInstallments,
+      installmentAmount: item.installment.amount,
+      paidAmount: item.paidAmount,
+      installmentRemaining: item.remainingAmount,
+      totalPendingDebt: item.totalSalePending,
+      dueDateStr: item.installment.dueDate,
     });
 
     navigator.clipboard.writeText(message);
     showToast('Mensaje de recordatorio copiado al portapapeles');
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
-
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
-      
-      {/* Header */}
+    <div className="space-y-6">
+      {/* Top Title Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            Cartera y Cobranzas
-            <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold">
-              {metrics.pendingCount} cuotas activas
-            </span>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+            <CreditCard className="w-6 h-6 text-indigo-600" />
+            Cuentas por Cobrar
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Seguimiento de cuotas, alertas de mora, abonos parciales y recordatorios automáticos
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Control de créditos, cuotas pendientes, fechas de vencimiento y cobranza
           </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate('/sales')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 transition-colors cursor-pointer"
-          >
-            <Receipt className="w-4 h-4 text-indigo-600" />
-            Nueva Venta a Crédito
-          </button>
         </div>
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Total Cartera */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Cartera Total</span>
-            <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
-              <CreditCard className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-lg sm:text-2xl font-mono font-bold text-slate-900">
-            {formatCurrency(metrics.totalPortfolioPending)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {metrics.pendingCount} cuotas por cobrar
-          </p>
-        </div>
-
-        {/* En Mora (Vencidas) */}
-        <div className={`p-4 rounded-2xl border shadow-xs transition-colors ${
-          metrics.overdueCount > 0 
-            ? 'bg-rose-50/70 border-rose-200 text-rose-950' 
-            : 'bg-white border-slate-200/80 text-slate-900'
-        }`}>
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1">
-              <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />
-              En Mora (Vencidas)
-            </span>
-            <div className="p-1.5 bg-rose-100 text-rose-700 rounded-lg">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-lg sm:text-2xl font-mono font-bold text-rose-700">
-            {formatCurrency(metrics.totalOverdue)}
-          </div>
-          <p className="text-[11px] text-rose-600/80 font-medium mt-1">
-            {metrics.overdueCount === 0 ? 'Sin cuotas vencidas 🎉' : `${metrics.overdueCount} cuotas requieren cobro`}
-          </p>
-        </div>
-
-        {/* Vencen esta Semana */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Próximos 7 Días</span>
-            <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
-              <Calendar className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-lg sm:text-2xl font-mono font-bold text-amber-700">
-            {formatCurrency(metrics.totalDueThisWeek)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {metrics.dueThisWeekCount} cuotas por vencer
-          </p>
-        </div>
-
-        {/* Total Recaudado */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Abonos Recaudados</span>
-            <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-lg sm:text-2xl font-mono font-bold text-emerald-700">
-            {formatCurrency(metrics.totalPaidCollected)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Total pagado en créditos
-          </p>
-        </div>
-      </div>
+      <ReceivablesKPIs
+        totalPortfolioPending={metrics.totalPortfolioPending}
+        pendingCount={metrics.pendingCount}
+        totalOverdue={metrics.totalOverdue}
+        overdueCount={metrics.overdueCount}
+        totalDueThisWeek={metrics.totalDueThisWeek}
+        dueThisWeekCount={metrics.dueThisWeekCount}
+        totalPaidCollected={metrics.totalPaidCollected}
+      />
 
       {/* Tabs Filter Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200/80 no-scrollbar -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
-        <button
-          type="button"
-          onClick={() => setActiveTab('pending')}
-          className={`min-h-[44px] px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 cursor-pointer flex items-center gap-2 ${
-            activeTab === 'pending'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 bg-white border border-slate-200/80 hover:bg-slate-50'
-          }`}
-        >
-          Todas las Pendientes
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-            activeTab === 'pending' ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700'
-          }`}>
-            {metrics.pendingCount}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('overdue')}
-          className={`min-h-[44px] px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 cursor-pointer flex items-center gap-2 ${
-            activeTab === 'overdue'
-              ? 'bg-rose-600 text-white shadow-sm'
-              : 'text-rose-700 bg-rose-50 hover:bg-rose-100/80 border border-rose-200/60'
-          }`}
-        >
-          🚨 En Mora (Vencidas)
-          {metrics.overdueCount > 0 && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-white text-rose-700 font-black shadow-2xs">
-              {metrics.overdueCount}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('today')}
-          className={`min-h-[44px] px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 cursor-pointer flex items-center gap-2 ${
-            activeTab === 'today'
-              ? 'bg-amber-600 text-white shadow-sm'
-              : 'text-amber-800 bg-amber-50 hover:bg-amber-100/80 border border-amber-200/60'
-          }`}
-        >
-          Vencen Hoy
-          {metrics.dueTodayCount > 0 && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900 font-bold">
-              {metrics.dueTodayCount}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('this-week')}
-          className={`min-h-[44px] px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 cursor-pointer flex items-center gap-2 ${
-            activeTab === 'this-week'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 bg-white border border-slate-200/80 hover:bg-slate-50'
-          }`}
-        >
-          Esta Semana ({metrics.dueThisWeekCount})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('upcoming')}
-          className={`min-h-[44px] px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 cursor-pointer ${
-            activeTab === 'upcoming'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 bg-white border border-slate-200/80 hover:bg-slate-50'
-          }`}
-        >
-          Futuras
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('paid')}
-          className={`min-h-[44px] px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 cursor-pointer ${
-            activeTab === 'paid'
-              ? 'bg-emerald-700 text-white shadow-sm'
-              : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/60'
-          }`}
-        >
-          Pagadas
-        </button>
-      </div>
+      <ReceivablesTabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        pendingCount={metrics.pendingCount}
+        overdueCount={metrics.overdueCount}
+        dueTodayCount={metrics.dueTodayCount}
+        dueThisWeekCount={metrics.dueThisWeekCount}
+      />
 
       {/* Search & Sort Controls */}
       <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -470,11 +305,7 @@ export function Receivables() {
             ))}
           </div>
         ) : displayedItems.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center"
-          >
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center animate-in fade-in duration-200">
             <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400">
               <CreditCard className="w-6 h-6" />
             </div>
@@ -486,213 +317,22 @@ export function Receivables() {
                 ? '¡Excelente noticia! No tienes ninguna cuota vencida en mora.'
                 : 'No hay cuotas en este filtro actualmente.'}
             </p>
-          </motion.div>
+          </div>
         ) : (
           <div className="space-y-3 animate-in fade-in duration-200">
-            {displayedItems.map(item => {
-              const isFullyPaid = item.remainingAmount <= 0.01;
-              const percentPaid = item.installment.amount > 0 
-                ? Math.min(100, Math.round((item.paidAmount / item.installment.amount) * 100))
-                : 100;
-              const hasPartialPayment = item.paidAmount > 0 && !isFullyPaid;
-
-              return (
-                <div 
-                  key={`${item.sale.id}-${item.installment.number}`}
-                  className={`bg-white rounded-2xl border transition-all p-4 sm:p-5 shadow-2xs hover:shadow-xs space-y-3.5 ${
-                    item.dueInfo.isOverdue && !isFullyPaid 
-                      ? 'border-rose-200/90 bg-rose-50/15' 
-                      : item.dueInfo.isToday && !isFullyPaid
-                      ? 'border-amber-200/90 bg-amber-50/15'
-                      : isFullyPaid
-                      ? 'border-slate-200/70 bg-slate-50/30 opacity-80'
-                      : 'border-slate-200/90'
-                  }`}
-                >
-                {/* Header Row: Customer Info & Status Badge */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                  <div className="flex items-start sm:items-center gap-3">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
-                      isFullyPaid 
-                        ? 'bg-emerald-100 text-emerald-800' 
-                        : item.dueInfo.isOverdue 
-                        ? 'bg-rose-100 text-rose-800' 
-                        : item.dueInfo.isToday
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-indigo-50 text-indigo-700'
-                    }`}>
-                      #{item.installment.number}
-                    </div>
-
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-bold text-slate-900">
-                          {item.sale.customerName || 'Cliente sin nombre'}
-                        </span>
-                        {item.sale.customerPhone && (
-                          <span className="text-xs text-slate-500 font-mono">
-                            • {item.sale.customerPhone}
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSaleForReceipt(item.sale)}
-                          className="font-mono font-semibold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                          title="Ver tirilla de la compra"
-                        >
-                          Factura #{item.sale.id.slice(0, 6).toUpperCase()}
-                        </button>
-                        <span>• Venta del {new Date(item.sale.date).toLocaleDateString()}</span>
-                        <span>• Cuota {item.installment.number} de {item.totalSaleInstallments}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Due date badge */}
-                  <div>
-                    {isFullyPaid ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Pagada completamente
-                      </span>
-                    ) : item.dueInfo.isOverdue ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                        <Clock className="w-3.5 h-3.5 text-rose-600" />
-                        {item.dueInfo.statusLabel} ({item.dueInfo.shortFormattedDate})
-                      </span>
-                    ) : item.dueInfo.isToday ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                        Vence hoy ({item.dueInfo.shortFormattedDate})
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                        {item.dueInfo.statusLabel} ({item.dueInfo.shortFormattedDate})
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Financial Details Box */}
-                <div className="bg-slate-50/90 rounded-xl p-3 border border-slate-200/70 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Valor Cuota
-                      </span>
-                      <span className="font-mono font-bold text-xs sm:text-sm text-slate-800">
-                        {formatCurrency(item.installment.amount)}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
-                        Abonado
-                      </span>
-                      <span className="font-mono font-bold text-xs sm:text-sm text-emerald-700">
-                        {formatCurrency(item.paidAmount)}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">
-                        Saldo Por Cobrar
-                      </span>
-                      <span className={`font-mono font-black text-sm sm:text-base ${
-                        isFullyPaid ? 'text-emerald-700' : 'text-amber-800'
-                      }`}>
-                        {formatCurrency(item.remainingAmount)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Partial progress bar */}
-                  {hasPartialPayment && (
-                    <div className="w-full sm:w-48 space-y-1">
-                      <div className="flex justify-between text-[10px] font-bold text-slate-500">
-                        <span>Abonado: {percentPaid}%</span>
-                        <span className="text-amber-700">Resta: {formatCurrency(item.remainingAmount)}</span>
-                      </div>
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                        <div 
-                          className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                          style={{ width: `${percentPaid}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Action Buttons Toolbar - Optimized for Mobile Thumb Navigation */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* WhatsApp Reminder Button */}
-                    {!isFullyPaid && (
-                      <div className="inline-flex items-stretch rounded-2xl shadow-2xs border border-emerald-300/80 bg-emerald-50 overflow-hidden flex-1 sm:flex-initial">
-                        <button
-                          type="button"
-                          onClick={() => handleSendReminder(item)}
-                          className="min-h-[44px] px-3.5 py-2.5 text-xs font-extrabold text-emerald-800 hover:bg-emerald-100/90 active:bg-emerald-200 transition-all cursor-pointer flex items-center justify-center gap-2 flex-1 sm:flex-initial select-none"
-                          title="Enviar recordatorio automático por WhatsApp"
-                        >
-                          <MessageSquare className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>Recordar Pago</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyMessage(item)}
-                          className="min-h-[44px] min-w-[44px] px-2.5 flex items-center justify-center hover:bg-emerald-100/90 active:bg-emerald-200 text-emerald-700 border-l border-emerald-300/70 transition-all cursor-pointer select-none"
-                          title="Copiar texto del recordatorio"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* View Receipt Button */}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSaleForReceipt(item.sale)}
-                      className="min-h-[44px] px-3.5 py-2.5 rounded-2xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200/90 active:bg-slate-300 transition-all cursor-pointer flex items-center justify-center gap-2 select-none flex-1 sm:flex-initial"
-                    >
-                      <Receipt className="w-4 h-4 text-slate-500 shrink-0" />
-                      <span>Ver Tirilla</span>
-                    </button>
-                  </div>
-
-                  {/* Payment Button - Prominent touch target on Mobile */}
-                  <div className="flex items-stretch sm:items-center gap-2 sm:ml-auto">
-                    {!isFullyPaid ? (
-                      <button
-                        type="button"
-                        onClick={() => setPaymentModalData({ sale: item.sale, installment: item.installment })}
-                        className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98 select-none"
-                      >
-                        <DollarSign className="w-4 h-4" />
-                        <span>Abonar / Pagar</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setPaymentModalData({ sale: item.sale, installment: item.installment })}
-                        className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 transition-all cursor-pointer flex items-center justify-center gap-1.5 select-none"
-                        title="Ver detalles o historial de abonos"
-                      >
-                        <span>Ver Abonos</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+            {displayedItems.map(item => (
+              <ReceivableCard
+                key={`${item.sale.id}-${item.installment.number}`}
+                item={item}
+                onSendReminder={handleSendReminder}
+                onCopyMessage={handleCopyMessage}
+                onViewReceipt={(sale) => setSelectedSaleForReceipt(sale)}
+                onOpenPayment={(sale, inst) => setPaymentModalData({ sale, installment: inst })}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Modal: Partial / Full Payment */}
       {paymentModalData && (
@@ -742,7 +382,6 @@ export function Receivables() {
           <span>{toastMessage}</span>
         </div>
       )}
-
     </div>
   );
 }
