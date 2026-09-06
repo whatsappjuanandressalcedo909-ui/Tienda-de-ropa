@@ -39,6 +39,27 @@ export interface InstallmentPaymentRecord {
   note?: string;
 }
 
+export type SyncActionType = 
+  | 'SAVE_CUSTOMER'
+  | 'DELETE_CUSTOMER'
+  | 'SAVE_PRODUCT'
+  | 'DELETE_PRODUCT'
+  | 'ADD_SALE'
+  | 'CANCEL_SALE'
+  | 'UPDATE_INSTALLMENTS'
+  | 'UPDATE_SETTINGS';
+
+export interface SyncAction {
+  id: string;
+  type: SyncActionType;
+  payload: any;
+  createdAt: string;
+  status: 'pending' | 'syncing' | 'failed';
+  attempts: number;
+  lastError?: string;
+  description: string;
+}
+
 export interface Installment {
   number: number;
   amount: number;

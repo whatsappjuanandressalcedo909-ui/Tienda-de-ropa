@@ -12,7 +12,7 @@ import { CustomerHistoryModal } from '../components/customers/CustomerHistoryMod
 import { CustomerListItem } from '../components/customers/CustomerListItem';
 
 export function Customers() {
-  const { customers, saveCustomer, deleteCustomer, sales, isLoading } = useInventory();
+  const { customers, saveCustomer, deleteCustomer, sales, isLoading, isOnline, pendingSyncCount } = useInventory();
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,6 +112,13 @@ export function Customers() {
   const handleSaveCustomer = (customerData: { firstName: string; lastName: string; email: string; phone?: string }) => {
     saveCustomer(customerData, editingCustomer?.id);
     setIsModalOpen(false);
+    if (!isOnline) {
+      setToastNotification(`¡Cliente guardado en IndexedDB! Se sincronizará automáticamente con Firebase al recuperar conexión.`);
+      setTimeout(() => setToastNotification(null), 4500);
+    } else {
+      setToastNotification(`Cliente ${customerData.firstName} guardado exitosamente.`);
+      setTimeout(() => setToastNotification(null), 3000);
+    }
   };
 
   const handleDelete = (c: Customer) => {
