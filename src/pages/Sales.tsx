@@ -12,21 +12,6 @@ import { InstallmentReceipt } from '../components/InstallmentReceipt';
 
 type DateFilter = 'all' | 'today' | 'week' | 'month';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-};
-
 export function Sales() {
   const { sales, inventory, customers, saveCustomer, addSale, cancelSale, hasMoreSales, loadMoreSales, isLoading } = useInventory();
   const [searchParams] = useSearchParams();
@@ -396,12 +381,10 @@ export function Sales() {
             </p>
           </motion.div>
         ) : (
-          <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+          <div className="space-y-4 animate-in fade-in duration-200">
             {filteredSales.map(sale => (
-              <motion.div 
+              <div 
                 key={sale.id} 
-                variants={itemVariants}
-                layoutId={`sale-${sale.id}`}
                 className={`bg-white p-5 rounded-3xl shadow-[0_2px_12px_rgba(0,0,0,0.02)] border transition-all ${sale.status === 'cancelled' ? 'border-red-100/60 opacity-75' : 'border-slate-100/60'}`}
               >
                 <div className="flex items-start justify-between mb-3 border-b border-slate-50 pb-3">
@@ -520,20 +503,20 @@ export function Sales() {
                   </div>
                 );
               })()}
-            </motion.div>
+            </div>
           ))}
           
           {hasMoreSales && filteredSales.length > 0 && (
-            <motion.div variants={itemVariants} className="pt-4 flex justify-center">
+            <div className="pt-4 flex justify-center">
               <button
                 onClick={loadMoreSales}
                 className="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl shadow-sm hover:bg-slate-50 active:scale-95 transition-all"
               >
                 Cargar más ventas históricas
               </button>
-            </motion.div>
+            </div>
           )}
-        </motion.div>
+        </div>
       )}
     </div>
 

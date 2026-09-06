@@ -13,21 +13,6 @@ import { useNavigate } from 'react-router-dom';
 import { InstallmentReceipt } from '../components/InstallmentReceipt';
 import { downloadOrShareCustomerPDF } from '../utils/pdfGenerator';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-};
-
 export function Customers() {
   const { customers, saveCustomer, deleteCustomer, sales, isLoading } = useInventory();
   const navigate = useNavigate();
@@ -348,16 +333,14 @@ export function Customers() {
             )}
           </motion.div>
         ) : (
-          <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-3">
+          <div className="space-y-3 animate-in fade-in duration-200">
             {filteredCustomers.map(customer => {
               const stats = customerStatsMap.get(customer.id) || { totalSpent: 0, purchaseCount: 0 };
               const initials = `${customer.firstName.charAt(0)}${customer.lastName.charAt(0)}`.toUpperCase();
 
               return (
-                <motion.div 
+                <div 
                   key={customer.id} 
-                  variants={itemVariants}
-                  layoutId={`customer-${customer.id}`}
                   className="bg-white rounded-3xl shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100/70 hover:border-slate-200 transition-all overflow-hidden"
                 >
                   {/* Header/Summary (Always visible) */}
@@ -531,10 +514,10 @@ export function Customers() {
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </motion.div>
+                </div>
               );
           })}
-        </motion.div>
+        </div>
       )}
     </div>
 

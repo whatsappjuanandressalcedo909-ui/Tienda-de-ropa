@@ -145,21 +145,10 @@ export function Layout() {
 
       {/* 
         MAIN CONTENT AREA
-        Uses AnimatePresence for smooth fade/slide transitions on route changes.
+        Renders routes immediately without blocking exit animations or opacity lag.
       */}
       <main className="flex-1 md:ml-64 max-w-5xl mx-auto w-full px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6 overflow-x-hidden">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="w-full"
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+        <Outlet />
       </main>
 
       {/* Touch-Friendly Ergonomic Bottom Navigation Bar for Mobile */}

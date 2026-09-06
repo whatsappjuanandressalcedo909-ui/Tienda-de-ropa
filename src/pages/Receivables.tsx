@@ -34,21 +34,6 @@ interface InstallmentRowItem {
 type FilterTab = 'pending' | 'overdue' | 'today' | 'this-week' | 'upcoming' | 'paid';
 type SortOption = 'urgent' | 'amount-desc' | 'customer-asc' | 'date-desc';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-};
-
 export function Receivables() {
   const { sales, customers, isLoading } = useInventory();
   const navigate = useNavigate();
@@ -503,7 +488,7 @@ export function Receivables() {
             </p>
           </motion.div>
         ) : (
-          <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-3">
+          <div className="space-y-3 animate-in fade-in duration-200">
             {displayedItems.map(item => {
               const isFullyPaid = item.remainingAmount <= 0.01;
               const percentPaid = item.installment.amount > 0 
@@ -512,10 +497,8 @@ export function Receivables() {
               const hasPartialPayment = item.paidAmount > 0 && !isFullyPaid;
 
               return (
-                <motion.div 
+                <div 
                   key={`${item.sale.id}-${item.installment.number}`}
-                  variants={itemVariants}
-                  layoutId={`installment-${item.sale.id}-${item.installment.number}`}
                   className={`bg-white rounded-2xl border transition-all p-4 sm:p-5 shadow-2xs hover:shadow-xs space-y-3.5 ${
                     item.dueInfo.isOverdue && !isFullyPaid 
                       ? 'border-rose-200/90 bg-rose-50/15' 
@@ -704,10 +687,10 @@ export function Receivables() {
                     )}
                   </div>
                 </div>
-              </motion.div>
+              </div>
             );
           })}
-        </motion.div>
+        </div>
       )}
     </div>
 

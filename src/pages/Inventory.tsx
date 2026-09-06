@@ -6,21 +6,6 @@ import { useInventory } from '../context/InventoryContext';
 import { SortOption } from '../types';
 import { ProductCard } from '../components/ProductCard';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-};
-
 export function Inventory() {
   const { inventory, isLoading } = useInventory();
   const navigate = useNavigate();
@@ -115,21 +100,16 @@ export function Inventory() {
           )}
         </motion.div>
       ) : (
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
-        >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 animate-in fade-in duration-200">
           {filteredInventory.map(product => (
-            <motion.div key={product.id} variants={itemVariants} layoutId={`product-${product.id}`}>
+            <div key={product.id}>
               <ProductCard 
                 product={product} 
                 onEdit={() => navigate(`/product/${product.id}`)} 
               />
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
+        </div>
       )}
     </div>
   );

@@ -36,19 +36,6 @@ interface ManageListModalProps {
   renderExtraActions?: (item: string) => React.ReactNode;
 }
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.05 }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-};
-
 function ManageListModal({ title, items, onAdd, onRemove, onClose, renderExtraActions }: ManageListModalProps) {
   const [newValue, setNewValue] = useState('');
 
@@ -200,7 +187,7 @@ function DatabaseConnectionStatus() {
   }
 
   return (
-    <motion.div variants={itemVariants} className={`p-4 rounded-3xl border ${statusConfig.bgColor} flex items-center justify-between transition-colors`}>
+    <div className={`p-4 rounded-3xl border ${statusConfig.bgColor} flex items-center justify-between transition-colors`}>
       <div className="flex items-center gap-4">
         <div className="bg-white p-2.5 rounded-2xl shadow-sm">
           {statusConfig.icon}
@@ -223,7 +210,7 @@ function DatabaseConnectionStatus() {
       >
         <RefreshCw className={`w-4 h-4 ${status === 'comprobando' ? 'animate-spin text-indigo-500' : ''}`} />
       </button>
-    </motion.div>
+    </div>
   );
 }
 
@@ -240,19 +227,19 @@ export function Settings() {
   const [selectedCategoryForSizes, setSelectedCategoryForSizes] = useState<string | null>(null);
 
   return (
-    <motion.div variants={containerVariants} initial="hidden" animate="show" className="max-w-lg mx-auto space-y-5">
-      <motion.div variants={itemVariants} className="flex items-center justify-between">
+    <div className="max-w-lg mx-auto space-y-5 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between">
         <h2 className="text-xl font-black text-slate-900 tracking-tight">Ajustes</h2>
         <span className="text-xs font-bold text-slate-400 bg-white border border-slate-200/80 px-2.5 py-1 rounded-xl">
           v1.0 PWA
         </span>
-      </motion.div>
+      </div>
 
       {/* Connection Status Widget */}
       <DatabaseConnectionStatus />
 
       {/* Backup and Restore Card */}
-      <motion.div variants={itemVariants} className="bg-white rounded-3xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100/80 space-y-3">
+      <div className="bg-white rounded-3xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100/80 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-indigo-50 text-indigo-600">
@@ -285,9 +272,9 @@ export function Settings() {
             <span>Gestionar Backup (Exportar / Importar)</span>
           </button>
         </div>
-      </motion.div>
+      </div>
       
-      <motion.div variants={itemVariants} className="bg-white rounded-3xl p-2 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100/60 space-y-1">
+      <div className="bg-white rounded-3xl p-2 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100/60 space-y-1">
         <button 
           onClick={() => setIsCategoryModalOpen(true)}
           className="w-full min-h-[56px] p-4 flex items-center gap-4 text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-all rounded-2xl group cursor-pointer"
@@ -313,9 +300,9 @@ export function Settings() {
             <p className="text-xs text-slate-500 font-medium mt-0.5">{sizes.length} tallas registradas</p>
           </div>
         </button>
-      </motion.div>
+      </div>
 
-      <motion.div variants={itemVariants} className="bg-white rounded-3xl p-2 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100/60">
+      <div className="bg-white rounded-3xl p-2 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100/60">
         <div className="min-h-[56px] p-4 border-b border-slate-50 flex items-center gap-4 text-slate-700">
           <div className="bg-slate-50 p-3 rounded-2xl">
             <Info className="w-5 h-5 text-slate-400"/>
@@ -341,7 +328,7 @@ export function Settings() {
             <p className="text-xs text-red-400 font-medium mt-0.5">Eliminará todos los productos y reiniciará la app</p>
           </div>
         </button>
-      </motion.div>
+      </div>
 
       {isCategoryModalOpen && (
         <ManageListModal 
@@ -394,6 +381,6 @@ export function Settings() {
         isOpen={isBackupModalOpen} 
         onClose={() => setIsBackupModalOpen(false)} 
       />
-    </motion.div>
+    </div>
   );
 }
