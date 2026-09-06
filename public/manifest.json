@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Inventario de Ropa",
+  "short_name": "Inventario",
+  "description": "PWA para gestión de inventarios, ventas, cuotas y cobranzas de tienda de ropa.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

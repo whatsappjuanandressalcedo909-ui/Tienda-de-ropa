@@ -1,0 +1,64 @@
+{
+  "products": {
+    "__doc__": {
+      "name": "string",
+      "description": "string",
+      "category": "string",
+      "size": "string",
+      "price": "number",
+      "cost": "number",
+      "stock": "number",
+      "image": "string",
+      "lastUpdated": "string"
+    }
+  },
+  "customers": {
+    "__doc__": {
+      "firstName": "string",
+      "lastName": "string",
+      "email": "string",
+      "phone": "string",
+      "address": "string",
+      "notes": "string",
+      "createdAt": "string"
+    }
+  },
+  "sales": {
+    "__doc__": {
+      "date": "string",
+      "total": "number",
+      "status": "string",
+      "paymentMethod": "string",
+      "customerId": "string",
+      "customerName": "string",
+      "amountPaid": "number",
+      "amountPending": "number",
+      "items": [
+        {
+          "productId": "string",
+          "productName": "string",
+          "quantity": "number",
+          "price": "number",
+          "subtotal": "number"
+        }
+      ],
+      "installments": [
+        {
+          "number": "number",
+          "amount": "number",
+          "dueDate": "string",
+          "status": "string",
+          "paidAt": "string",
+          "paidAmount": "number",
+          "notes": "string"
+        }
+      ]
+    }
+  },
+  "settings": {
+    "__doc__": {
+      "categories": ["string"],
+      "sizes": ["string"]
+    }
+  }
+}
